@@ -1,0 +1,9 @@
+[project]
+name = "mcp-servers-cli"
+version = "0.1.0"
+description = "CLI MCP servers exploration script"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastmcp>=3.4.4",
+]
