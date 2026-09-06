@@ -2,7 +2,7 @@
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/llassus/Developer"]
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "${HOME}/Developer"]
     },
     "fetch": {
       "command": "uvx",
