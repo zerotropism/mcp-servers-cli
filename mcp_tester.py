@@ -31,6 +31,19 @@ from fastmcp.client.transports import StdioTransport
 from fastmcp.client.transports import StreamableHttpTransport
 
 
+def _expand_config_paths(server_config: dict) -> dict:
+    """Résout ~ et les variables d'environnement dans args et command."""
+    if "command" in server_config:
+        server_config["command"] = os.path.expanduser(
+            os.path.expandvars(server_config["command"])
+        )
+    if "args" in server_config:
+        server_config["args"] = [
+            os.path.expanduser(os.path.expandvars(a)) for a in server_config["args"]
+        ]
+    return server_config
+
+
 def print_section(title: str):
     print(f"\n{'─' * 50}\n{title}\n{'─' * 50}")
 
@@ -138,7 +151,8 @@ def build_client(mode: str, args: list[str]) -> Client:
                 f"Serveur '{server_name}' introuvable. Disponibles: {list(servers.keys())}"
             )
             sys.exit(1)
-        return Client({"mcpServers": {server_name: servers[server_name]}})
+        resolved = _expand_config_paths(servers[server_name])
+        return Client({"mcpServers": {server_name: resolved}})
 
     raise ValueError(f"Mode inconnu: {mode}")
 
