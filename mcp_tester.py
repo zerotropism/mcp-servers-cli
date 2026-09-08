@@ -19,27 +19,26 @@ pour appeler un tool avec des arguments JSON.
 Dépendances : pip install fastmcp
 """
 
-import os
-import sys
-import json
-import shlex
 import asyncio
-
+import json
+import os
+import shlex
+import sys
 from pathlib import Path
+
 from fastmcp import Client
-from fastmcp.client.transports import StdioTransport
-from fastmcp.client.transports import StreamableHttpTransport
+from fastmcp.client.transports import StdioTransport, StreamableHttpTransport
 
 
 def _expand_config_paths(server_config: dict) -> dict:
     """Résout ~ et les variables d'environnement dans args et command."""
     if "command" in server_config:
-        server_config["command"] = os.path.expanduser(
-            os.path.expandvars(server_config["command"])
+        server_config["command"] = str(
+            Path(os.path.expandvars(server_config["command"])).expanduser()
         )
     if "args" in server_config:
         server_config["args"] = [
-            os.path.expanduser(os.path.expandvars(a)) for a in server_config["args"]
+            str(Path(os.path.expandvars(a)).expanduser()) for a in server_config["args"]
         ]
     return server_config
 
@@ -56,11 +55,7 @@ async def explore(client: Client):
             print(f"  • {t.name} — {t.description or '(pas de description)'}")
             if t.inputSchema and t.inputSchema.get("properties"):
                 for pname, pschema in t.inputSchema["properties"].items():
-                    req = (
-                        " (requis)"
-                        if pname in t.inputSchema.get("required", [])
-                        else ""
-                    )
+                    req = " (requis)" if pname in t.inputSchema.get("required", []) else ""
                     print(f"      - {pname}: {pschema.get('type', '?')}{req}")
 
         print_section("📦 RESOURCES")
@@ -100,10 +95,7 @@ async def explore(client: Client):
                     result = await client.call_tool(name, args)
                     print(
                         json.dumps(
-                            [
-                                c.text if hasattr(c, "text") else str(c)
-                                for c in result.content
-                            ],
+                            [c.text if hasattr(c, "text") else str(c) for c in result.content],
                             indent=2,
                             ensure_ascii=False,
                         )
@@ -118,9 +110,7 @@ async def explore(client: Client):
                         )
                     )
                 else:
-                    print(
-                        'Syntaxe: call <tool_name> {"arg": "valeur"}  |  read <uri>  |  quit'
-                    )
+                    print('Syntaxe: call <tool_name> {"arg": "valeur"}  |  read <uri>  |  quit')
             except Exception as e:
                 print(f"❌ Erreur: {e}")
 
@@ -136,9 +126,7 @@ def build_client(mode: str, args: list[str]) -> Client:
         token = os.environ.get("MCP_TOKEN")
         if token:
             return Client(
-                StreamableHttpTransport(
-                    url, headers={"Authorization": f"Bearer {token}"}
-                )
+                StreamableHttpTransport(url, headers={"Authorization": f"Bearer {token}"})
             )
         return Client(url)
 
@@ -147,9 +135,7 @@ def build_client(mode: str, args: list[str]) -> Client:
         config = json.loads(Path(config_path).read_text())
         servers = config.get("mcpServers", config)
         if server_name not in servers:
-            print(
-                f"Serveur '{server_name}' introuvable. Disponibles: {list(servers.keys())}"
-            )
+            print(f"Serveur '{server_name}' introuvable. Disponibles: {list(servers.keys())}")
             sys.exit(1)
         resolved = _expand_config_paths(servers[server_name])
         return Client({"mcpServers": {server_name: resolved}})
