@@ -1,15 +1,27 @@
 [project]
 name = "mcp-servers-cli"
 version = "0.1.0"
-description = "CLI MCP servers exploration script"
+description = "Inspect, call and drive any MCP server from the command line"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "fastmcp>=3.4.4",
+    "fastmcp>=4",
+    "cyclopts>=4",
+    "rich>=14",
 ]
+
+[project.scripts]
+mcp-servers-cli = "mcp_servers_cli.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    "pytest-asyncio>=1.4",
     "ruff>=0.16.6",
 ]
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
