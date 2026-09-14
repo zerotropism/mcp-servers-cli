@@ -24,17 +24,24 @@ def expand(token: str) -> str:
     return expanded
 
 
-def stdio_client(command: str, env: dict[str, str] | None = None) -> Client:
+def stdio_client(
+    command: str,
+    env: dict[str, str] | None = None,
+    log_file: Path | None = None,
+) -> Client:
     """Run a server as a subprocess.
 
     The MCP SDK only forwards a whitelist of environment variables to that subprocess
     (HOME, LOGNAME, PATH, SHELL, TERM, USER), so anything the server needs must be
     passed explicitly through `env`.
+
+    `log_file` captures the subprocess stderr. Servers built on older MCP SDKs log a
+    wall of validation errors when FastMCP 4 probes them, which drowns the output.
     """
     parts = [expand(token) for token in shlex.split(command)]
     if not parts:
         raise ValueError("Empty stdio command")
-    return Client(StdioTransport(command=parts[0], args=parts[1:], env=env))
+    return Client(StdioTransport(command=parts[0], args=parts[1:], env=env, log_file=log_file))
 
 
 def http_client(url: str) -> Client:
