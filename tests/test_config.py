@@ -1,29 +1,24 @@
-"""Smoke tests: config parsing and path expansion."""
+"""The shipped config.json must stay loadable by the config transport."""
 
 import json
-import os
-import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
+from mcp_servers_cli.transports import _expand_entry
 
-import mcp_tester  # noqa: E402
-
-
-def test_module_imports() -> None:
-    assert hasattr(mcp_tester, "build_client")
+CONFIG = Path(__file__).resolve().parent.parent / "config.json"
 
 
 def test_config_file_is_valid_json() -> None:
-    config = json.loads((ROOT / "config.json").read_text())
+    config = json.loads(CONFIG.read_text())
     assert "mcpServers" in config
-    assert "filesystem" in config["mcpServers"]
 
 
-def test_env_vars_are_expanded() -> None:
-    config = json.loads((ROOT / "config.json").read_text())
-    args = config["mcpServers"]["filesystem"]["args"]
-    expanded = [str(Path(os.path.expandvars(a)).expanduser()) for a in args]
-    assert not any("${" in a for a in expanded)
-    assert any(a.startswith("/") for a in expanded)
+def test_every_entry_expands_to_a_usable_command(monkeypatch) -> None:
+    """No placeholder must survive expansion, or the server is launched with a literal ${HOME}."""
+    monkeypatch.setenv("HOME", "/home/testuser")
+    servers = json.loads(CONFIG.read_text())["mcpServers"]
+
+    for name, entry in servers.items():
+        expanded = _expand_entry(entry)
+        assert "${" not in json.dumps(expanded), name
+        assert "command" in expanded or "url" in expanded, name
