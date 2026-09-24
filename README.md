@@ -61,6 +61,19 @@ The sum is 5.
 - A failing tool, an unknown tool name or an invented argument does not stop the run: the model
   reads the error or gets the cleaned call, and can correct itself.
 - `--max-steps` (default 10) bounds the model turns; running out is an error, not a silent stop.
+- `--dry-run` asks the model once and prints the calls it would make, running none: a safe first
+  look at a server whose tools write or delete.
+- `--trace run.jsonl` writes one JSON object per executed call (time, tool, arguments, duration,
+  error flag, a 500-character excerpt of the result) and a closing `end` line.
+
+A trace reads with any JSON tool, for instance the slowest calls first:
+
+```bash
+jq -r 'select(.event == "tool") | "\(.duration_ms) ms  \(.tool)"' run.jsonl | sort -rn
+```
+
+Arguments and results are written as they are: keep traces out of version control when a server
+handles secrets.
 
 ## Configuring the server you launch
 
@@ -131,6 +144,7 @@ src/mcp_servers_cli/
 ├── llm.py          provider-neutral conversation model and the LLMBackend protocol
 ├── backends/       one module per provider, translating to and from that model
 ├── agent.py        the tool loop: model turns and tool calls, printing nothing
+├── trace.py        JSON Lines record of an agent run
 └── cli.py          cyclopts commands
 ```
 
@@ -152,7 +166,8 @@ uv run pytest
 
 No network and no LLM. The inspection and agent-loop tests run against an in-memory FastMCP
 server with a scripted model; the transport tests check expansion rules; the rendering tests
-capture a rich console; the backend tests translate real SDK objects through a stand-in client.
+capture a rich console; the backend tests translate real SDK objects through a stand-in client;
+the trace tests write to a temporary directory.
 Two kinds of test start a process: the error tests launch a command that does not exist, and the
 agent command is tested end to end against `tests/fixtures/add_server.py` over stdio.
 
