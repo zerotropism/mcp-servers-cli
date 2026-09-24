@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mcp-servers-cli = "mcp_servers_cli.cli:app"
+mcp-servers-cli = "mcp_servers_cli.cli:main"
 
 [build-system]
 requires = ["hatchling"]
