@@ -9,6 +9,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from mcp_servers_cli.inspection import ServerInfo
+from mcp_servers_cli.llm import ToolCall, ToolResult
 
 console = Console()
 
@@ -67,3 +68,23 @@ def render_blocks(blocks: Any) -> None:
     """Single renderer shared by tool calls and resource reads."""
     payload = json.dumps(to_text(blocks), indent=2, ensure_ascii=False)
     console.print(Syntax(payload, "json", theme="ansi_dark", background_color="default"))
+
+
+def render_tool_call(call: ToolCall) -> None:
+    """One dim line per call, so the user sees what the model decided to do."""
+    arguments = json.dumps(call.arguments, ensure_ascii=False)
+    console.print(f"[dim]-> {escape(call.name)} {escape(arguments)}[/dim]")
+
+
+def render_tool_result(call: ToolCall, result: ToolResult, elapsed: float) -> None:
+    """Status and duration; on failure, the first line of the error the model will read."""
+    if result.is_error:
+        reason = result.content.splitlines()[0] if result.content else "no detail"
+        status = f"[red]error[/red] {escape(reason)}"
+    else:
+        status = "ok"
+    console.print(f"[dim]<- {escape(call.name)}[/dim] {status} [dim]({elapsed:.1f}s)[/dim]")
+
+
+def render_answer(text: str) -> None:
+    console.print(escape(text))
