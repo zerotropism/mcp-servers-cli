@@ -11,9 +11,17 @@ from fastmcp import Client
 from rich.console import Console
 from rich.markup import escape
 
+from mcp_servers_cli.agent import DEFAULT_MAX_STEPS, run_agent
+from mcp_servers_cli.backends import BACKENDS, create_backend
 from mcp_servers_cli.errors import DEBUG_ENV_VAR, describe
 from mcp_servers_cli.inspection import inspect_server
-from mcp_servers_cli.rendering import render_blocks, render_server
+from mcp_servers_cli.rendering import (
+    render_answer,
+    render_blocks,
+    render_server,
+    render_tool_call,
+    render_tool_result,
+)
 from mcp_servers_cli.repl import run_repl
 from mcp_servers_cli.transports import config_client, http_client, stdio_client
 
@@ -124,6 +132,42 @@ async def repl(
     async with build_client(stdio, http, config, server, env, quiet) as client:
         render_server(await inspect_server(client))
         await run_repl(client)
+
+
+@app.command
+async def agent(
+    prompt: str,
+    *,
+    model: Annotated[str, Parameter(help="Model name, e.g. qwen3.5:4b or claude-sonnet-5.")],
+    backend: Annotated[
+        str, Parameter(help=f"LLM backend: {', '.join(sorted(BACKENDS))}.")
+    ] = "ollama",
+    system: Annotated[str, Parameter(help="System prompt given to the model.")] = "",
+    max_steps: Annotated[int, Parameter(help="Model turns allowed before giving up.")] = (
+        DEFAULT_MAX_STEPS
+    ),
+    stdio: Stdio = None,
+    http: Http = None,
+    config: Config = None,
+    server: Server = None,
+    env: Env = None,
+    quiet: Quiet = False,
+) -> None:
+    """Let a model use the server's tools to answer a prompt."""
+    llm = create_backend(backend, model)
+    async with build_client(stdio, http, config, server, env, quiet) as client:
+        run = await run_agent(
+            client,
+            llm,
+            prompt,
+            system=system,
+            max_steps=max_steps,
+            on_tool_call=render_tool_call,
+            on_tool_result=render_tool_result,
+        )
+    if run.stopped:
+        raise RuntimeError(f"no final answer after {max_steps} model turns (see --max-steps)")
+    render_answer(run.answer)
 
 
 def main(tokens: list[str] | None = None) -> None:

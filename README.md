@@ -35,9 +35,32 @@ mcp-servers-cli read "tasks://stats" --stdio "uv run server.py"
 
 # Inspect, then stay interactive
 mcp-servers-cli repl --stdio "uv run server.py"
+
+# Let a model use the tools to answer
+mcp-servers-cli agent "What is 2 + 3?" --model qwen3.5:4b --stdio "uv run server.py"
 ```
 
 Inside the REPL: `call <tool> <json>`, `read <uri>`, `list`, `quit`.
+
+## Agent
+
+`agent` hands the server's tools to a model and lets it call them until it answers in text. Each
+call is printed as it happens, then the answer:
+
+```
+-> add {"a": 2, "b": 3}
+<- add ok (0.1s)
+The sum is 5.
+```
+
+- `--model` is required: small local models can mishandle nested arguments, and a silent default
+  would hide that behind a plausible failure.
+- `--backend ollama` (default) talks to the server named by `OLLAMA_HOST`, localhost otherwise.
+- `--backend anthropic` needs the extra, `uvx --from 'mcp-servers-cli[anthropic]' mcp-servers-cli`,
+  and reads `ANTHROPIC_API_KEY` from the environment.
+- A failing tool, an unknown tool name or an invented argument does not stop the run: the model
+  reads the error or gets the cleaned call, and can correct itself.
+- `--max-steps` (default 10) bounds the model turns; running out is an error, not a silent stop.
 
 ## Configuring the server you launch
 
@@ -102,11 +125,12 @@ The `--config` mode reads the `mcpServers` format used by Claude Desktop:
 src/mcp_servers_cli/
 ├── transports.py   one builder per transport, plus path expansion
 ├── inspection.py   reads a server into dataclasses
-├── rendering.py    turns those dataclasses into tables
+├── rendering.py    turns inspection data, results and agent progress into output
 ├── repl.py         interactive loop over a connected client
 ├── errors.py       turns a failure into one line
 ├── llm.py          provider-neutral conversation model and the LLMBackend protocol
 ├── backends/       one module per provider, translating to and from that model
+├── agent.py        the tool loop: model turns and tool calls, printing nothing
 └── cli.py          cyclopts commands
 ```
 
@@ -126,10 +150,11 @@ Adding a provider means adding one module there and one line in `backends/__init
 uv run pytest
 ```
 
-No network and no server process: the inspection tests run against an in-memory FastMCP server,
-the transport tests check expansion rules, the rendering tests capture a rich console, and the
-error tests launch a command that does not exist. The backend tests translate real SDK objects
-through a stand-in client: neither Ollama nor an API key is needed.
+No network and no LLM. The inspection and agent-loop tests run against an in-memory FastMCP
+server with a scripted model; the transport tests check expansion rules; the rendering tests
+capture a rich console; the backend tests translate real SDK objects through a stand-in client.
+Two kinds of test start a process: the error tests launch a command that does not exist, and the
+agent command is tested end to end against `tests/fixtures/add_server.py` over stdio.
 
 ## Dependencies
 
