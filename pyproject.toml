@@ -8,10 +8,16 @@ dependencies = [
     "fastmcp>=4",
     "cyclopts>=4",
     "rich>=14",
+    "ollama>=0.6.2",
 ]
 
 [project.scripts]
 mcp-servers-cli = "mcp_servers_cli.cli:main"
+
+[project.optional-dependencies]
+anthropic = [
+    "anthropic>=1.8.0",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -19,6 +25,7 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "anthropic>=1.8.0",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4",
     "ruff>=0.16.6",
