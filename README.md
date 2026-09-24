@@ -105,6 +105,8 @@ src/mcp_servers_cli/
 ├── rendering.py    turns those dataclasses into tables
 ├── repl.py         interactive loop over a connected client
 ├── errors.py       turns a failure into one line
+├── llm.py          provider-neutral conversation model and the LLMBackend protocol
+├── backends/       one module per provider, translating to and from that model
 └── cli.py          cyclopts commands
 ```
 
@@ -115,6 +117,9 @@ stdout.
 Adding a transport means adding a builder in `transports.py` and a target option in `cli.py`,
 without touching the existing ones.
 
+Only `backends/` imports an LLM SDK; everything else works on the neutral types of `llm.py`.
+Adding a provider means adding one module there and one line in `backends/__init__.py`.
+
 ## Tests
 
 ```bash
@@ -123,7 +128,8 @@ uv run pytest
 
 No network and no server process: the inspection tests run against an in-memory FastMCP server,
 the transport tests check expansion rules, the rendering tests capture a rich console, and the
-error tests launch a command that does not exist.
+error tests launch a command that does not exist. The backend tests translate real SDK objects
+through a stand-in client: neither Ollama nor an API key is needed.
 
 ## Dependencies
 
@@ -132,6 +138,8 @@ error tests launch a command that does not exist.
 | `fastmcp`  | MCP client and transports             |
 | `cyclopts` | Commands and help, from type hints    |
 | `rich`     | Tables and JSON highlighting          |
+| `ollama`   | Local models, the default backend     |
+| `anthropic` | Anthropic backend, optional: `mcp-servers-cli[anthropic]` |
 
 `cyclopts` and `rich` already ship in FastMCP's dependency tree; they are declared explicitly
 rather than relied on transitively.
