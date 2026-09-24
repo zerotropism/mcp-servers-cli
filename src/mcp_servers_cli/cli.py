@@ -2,12 +2,16 @@
 
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Annotated
 
 from cyclopts import App, Group, Parameter
 from fastmcp import Client
+from rich.console import Console
+from rich.markup import escape
 
+from mcp_servers_cli.errors import DEBUG_ENV_VAR, describe
 from mcp_servers_cli.inspection import inspect_server
 from mcp_servers_cli.rendering import render_blocks, render_server
 from mcp_servers_cli.repl import run_repl
@@ -120,3 +124,16 @@ async def repl(
     async with build_client(stdio, http, config, server, env, quiet) as client:
         render_server(await inspect_server(client))
         await run_repl(client)
+
+
+def main(tokens: list[str] | None = None) -> None:
+    """Console entry point: one line per failure, the full trace when the debug variable is set."""
+    try:
+        app(tokens)
+    except KeyboardInterrupt:
+        sys.exit(130)
+    except Exception as exc:
+        if os.environ.get(DEBUG_ENV_VAR):
+            raise
+        Console(stderr=True, soft_wrap=True).print(f"[red]error:[/red] {escape(describe(exc))}")
+        sys.exit(1)

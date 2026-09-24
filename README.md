@@ -68,6 +68,17 @@ back to the legacy protocol — the inspection still succeeds, but the output is
 the reason is in its first stderr line, and hiding it turns a clear error into a bare
 "Connection closed".
 
+## Errors
+
+A failure prints one line naming its cause and exits with status 1:
+
+```
+error: Client failed to connect: [Errno 2] No such file or directory: 'uvx'
+```
+
+When a stdio server dies while starting, its own stderr line comes first and the error line points
+to it. Set `MCP_SERVERS_CLI_DEBUG=1` to get the full traceback instead.
+
 ## Configuration file
 
 The `--config` mode reads the `mcpServers` format used by Claude Desktop:
@@ -93,6 +104,7 @@ src/mcp_servers_cli/
 ├── inspection.py   reads a server into dataclasses
 ├── rendering.py    turns those dataclasses into tables
 ├── repl.py         interactive loop over a connected client
+├── errors.py       turns a failure into one line
 └── cli.py          cyclopts commands
 ```
 
@@ -109,8 +121,9 @@ without touching the existing ones.
 uv run pytest
 ```
 
-No subprocess and no network: the inspection tests run against an in-memory FastMCP server, the
-transport tests check expansion rules, and the rendering tests capture a rich console.
+No network and no server process: the inspection tests run against an in-memory FastMCP server,
+the transport tests check expansion rules, the rendering tests capture a rich console, and the
+error tests launch a command that does not exist.
 
 ## Dependencies
 
