@@ -11,18 +11,21 @@ from fastmcp import Client
 from rich.console import Console
 from rich.markup import escape
 
-from mcp_servers_cli.agent import DEFAULT_MAX_STEPS, run_agent
+from mcp_servers_cli.agent import DEFAULT_MAX_STEPS, first_turn, run_agent
 from mcp_servers_cli.backends import BACKENDS, create_backend
 from mcp_servers_cli.errors import DEBUG_ENV_VAR, describe
 from mcp_servers_cli.inspection import inspect_server
+from mcp_servers_cli.llm import LLMBackend, ToolCall, ToolResult
 from mcp_servers_cli.rendering import (
     render_answer,
     render_blocks,
+    render_plan,
     render_server,
     render_tool_call,
     render_tool_result,
 )
 from mcp_servers_cli.repl import run_repl
+from mcp_servers_cli.trace import Trace, open_trace
 from mcp_servers_cli.transports import config_client, http_client, stdio_client
 
 app = App(
@@ -146,6 +149,10 @@ async def agent(
     max_steps: Annotated[int, Parameter(help="Model turns allowed before giving up.")] = (
         DEFAULT_MAX_STEPS
     ),
+    trace: Annotated[
+        Path | None, Parameter(help="Write every tool call to this JSONL file.")
+    ] = None,
+    dry_run: Annotated[bool, Parameter(help="Show the model's first calls, run none.")] = False,
     stdio: Stdio = None,
     http: Http = None,
     config: Config = None,
@@ -155,16 +162,45 @@ async def agent(
 ) -> None:
     """Let a model use the server's tools to answer a prompt."""
     llm = create_backend(backend, model)
-    async with build_client(stdio, http, config, server, env, quiet) as client:
-        run = await run_agent(
-            client,
-            llm,
-            prompt,
-            system=system,
-            max_steps=max_steps,
-            on_tool_call=render_tool_call,
-            on_tool_result=render_tool_result,
-        )
+    with open_trace(trace) as recorder:
+        async with build_client(stdio, http, config, server, env, quiet) as client:
+            if dry_run:
+                await _plan(client, llm, prompt, system, recorder)
+            else:
+                await _solve(client, llm, prompt, system, max_steps, recorder)
+
+
+async def _plan(client: Client, llm: LLMBackend, prompt: str, system: str, recorder: Trace) -> None:
+    """--dry-run: one model turn, every requested call shown and none executed."""
+    reply = await first_turn(client, llm, prompt, system=system)
+    for call in reply.tool_calls:
+        recorder.planned(call)
+    recorder.end(steps=1, stopped=False, answer=reply.text)
+    if reply.tool_calls:
+        render_plan(reply.tool_calls)
+    else:
+        render_answer(reply.text)
+
+
+async def _solve(
+    client: Client, llm: LLMBackend, prompt: str, system: str, max_steps: int, recorder: Trace
+) -> None:
+    """The full run: every call printed and recorded as it happens, then the answer."""
+
+    def on_tool_result(call: ToolCall, result: ToolResult, elapsed: float) -> None:
+        render_tool_result(call, result, elapsed)
+        recorder.tool(call, result, elapsed)
+
+    run = await run_agent(
+        client,
+        llm,
+        prompt,
+        system=system,
+        max_steps=max_steps,
+        on_tool_call=render_tool_call,
+        on_tool_result=on_tool_result,
+    )
+    recorder.end(steps=run.steps, stopped=run.stopped, answer=run.answer)
     if run.stopped:
         raise RuntimeError(f"no final answer after {max_steps} model turns (see --max-steps)")
     render_answer(run.answer)

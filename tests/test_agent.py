@@ -3,7 +3,13 @@
 import pytest
 from fastmcp import Client, FastMCP
 
-from mcp_servers_cli.agent import MAX_RESULT_CHARS, result_text, run_agent, sanitize_args
+from mcp_servers_cli.agent import (
+    MAX_RESULT_CHARS,
+    first_turn,
+    result_text,
+    run_agent,
+    sanitize_args,
+)
 from mcp_servers_cli.llm import Message, ToolCall
 
 
@@ -131,3 +137,23 @@ def test_long_results_are_truncated() -> None:
     text = result_text(Result())
     assert len(text) < MAX_RESULT_CHARS + 100
     assert "[truncated:" in text
+
+
+async def test_first_turn_executes_nothing() -> None:
+    """The dry run asks the model once and never touches a tool."""
+    executed = []
+    mcp = FastMCP("Side effects")
+
+    @mcp.tool
+    def delete_all() -> str:
+        """Irreversible."""
+        executed.append("delete_all")
+        return "deleted"
+
+    backend = ScriptedBackend(ask(ToolCall("c1", "delete_all", {})))
+    async with Client(mcp) as client:
+        reply = await first_turn(client, backend, "clean up", system="careful")
+
+    assert [call.name for call in reply.tool_calls] == ["delete_all"]
+    assert executed == []
+    assert backend.requests[0][0] == "careful"

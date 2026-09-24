@@ -84,6 +84,14 @@ async def execute(client: Client, call: ToolCall, schemas: Mapping[str, Mapping]
     return ToolResult(call.id, call.name, result_text(result), result.is_error)
 
 
+async def first_turn(
+    client: Client, backend: LLMBackend, prompt: str, *, system: str = ""
+) -> Message:
+    """One model turn with the server's tools and nothing executed: what the model would do."""
+    specs = tool_specs(await client.list_tools())
+    return await backend.complete(system, [Message("user", prompt)], specs)
+
+
 async def run_agent(
     client: Client,
     backend: LLMBackend,

@@ -1,6 +1,7 @@
 """Turning inspection data and call results into terminal output."""
 
 import json
+from collections.abc import Sequence
 from typing import Any
 
 from rich.console import Console
@@ -84,6 +85,13 @@ def render_tool_result(call: ToolCall, result: ToolResult, elapsed: float) -> No
     else:
         status = "ok"
     console.print(f"[dim]<- {escape(call.name)}[/dim] {status} [dim]({elapsed:.1f}s)[/dim]")
+
+
+def render_plan(calls: Sequence[ToolCall]) -> None:
+    """Dry run: the calls the model asked for, none of them executed."""
+    console.print(f"[dim]{len(calls)} call(s) planned, none executed:[/dim]")
+    for call in calls:
+        render_tool_call(call)
 
 
 def render_answer(text: str) -> None:
