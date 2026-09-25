@@ -64,7 +64,10 @@ The sum is 5.
 - `--dry-run` asks the model once and prints the calls it would make, running none: a safe first
   look at a server whose tools write or delete.
 - `--trace run.jsonl` writes one JSON object per executed call (time, tool, arguments, duration,
-  error flag, a 500-character excerpt of the result) and a closing `end` line.
+  error flag, a 500-character excerpt of the result) and a closing `end` line with the model
+  turns, the number of calls and of failed calls, and the total duration.
+- When a tool call failed, a warning follows the answer on stderr: a model can answer as if its
+  calls had worked (see below).
 
 A trace reads with any JSON tool, for instance the slowest calls first:
 
@@ -74,6 +77,31 @@ jq -r 'select(.event == "tool") | "\(.duration_ms) ms  \(.tool)"' run.jsonl | so
 
 Arguments and results are written as they are: keep traces out of version control when a server
 handles secrets.
+
+## Model requirements
+
+Measured on 24 September 2026 against `mcpserver-template` (in-memory backend), three runs per
+model, with one prompt: add three tasks, complete one, list the pending ones. It takes a string
+argument, an integer read from an earlier result, and a nested object (`filter_tasks`).
+
+| Model            | Correct answers | Tool calls | Failed calls | Model turns |
+|------------------|-----------------|------------|--------------|-------------|
+| `qwen3.5:4b-mlx` | 3 / 3           | 5          | 0            | 4           |
+| `llama3.2:3b`    | 0 / 3           | 1 to 3     | 1 to 2       | 2           |
+
+`llama3.2:3b` failed every run. Its first planned call was `filter_tasks` with invented fields,
+before any task existed. In the run examined in detail, that filter was rejected and
+`complete_task` targeted a task that did not exist; yet each of the three answers described the
+work as done. That is the failure to watch for with small models: not a crash, but a fluent and
+false answer. Read the `<-` lines, or the warning printed after the answer, before trusting it.
+
+`qwen3.5:4b-mlx` sent the three `add_task` calls in one turn. Twice it filtered on the server
+(`{"status": "pending"}`); once it fetched every task and filtered the result itself. Both gave
+the right answer.
+
+Unknown top-level arguments are dropped before a call; an invented field inside a nested object
+is left to fail. Dropping `title` from a mistaken filter would widen it to every task and return
+a wrong answer that looks right.
 
 ## Configuring the server you launch
 
