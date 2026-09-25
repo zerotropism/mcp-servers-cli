@@ -36,11 +36,12 @@ def test_agent_prints_each_call_then_the_answer(monkeypatch, capsys) -> None:
     with pytest.raises(SystemExit) as exit_info:
         cli.main(["agent", "1 + 2?", "--model", "scripted", *TARGET])
 
-    output = capsys.readouterr().out
+    captured = capsys.readouterr()
     assert exit_info.value.code == 0
-    assert '-> add {"a": 1, "b": 2}' in output
-    assert "<- add ok" in output
-    assert output.rstrip().endswith("The sum is 3.")
+    assert '-> add {"a": 1, "b": 2}' in captured.out
+    assert "<- add ok" in captured.out
+    assert captured.out.rstrip().endswith("The sum is 3.")
+    assert "warning" not in captured.err
 
 
 def test_agent_without_an_answer_fails_in_one_line(monkeypatch, capsys) -> None:
@@ -93,4 +94,25 @@ def test_trace_records_each_executed_call(monkeypatch, tmp_path) -> None:
 
     tool, end = [json.loads(line) for line in trace.read_text().splitlines()]
     assert (tool["tool"], tool["result"], tool["is_error"]) == ("add", "5", False)
-    assert (end["steps"], end["answer"]) == (2, "5")
+    assert (end["steps"], end["answer"], end["tool_calls"], end["failed_calls"]) == (2, "5", 1, 0)
+    assert end["elapsed_s"] >= 0
+
+
+def test_a_failed_call_is_flagged_after_the_answer(monkeypatch, capsys) -> None:
+    """A small model can answer as if its failed calls had worked: the warning says otherwise."""
+    use_backend(
+        monkeypatch,
+        ScriptedBackend(
+            Message("assistant", tool_calls=(ToolCall("c1", "multiply", {"a": 2, "b": 3}),)),
+            Message("assistant", "The product is 6."),
+        ),
+    )
+    with pytest.raises(SystemExit) as exit_info:
+        cli.main(["agent", "2 * 3?", "--model", "m", *TARGET])
+
+    captured = capsys.readouterr()
+    assert exit_info.value.code == 0
+    assert captured.out.rstrip().endswith("The product is 6.")
+    assert captured.err.strip() == (
+        "warning: 1 of 1 tool call(s) failed; the answer may not reflect the server's state"
+    )

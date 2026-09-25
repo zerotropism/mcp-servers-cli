@@ -15,13 +15,14 @@ def test_each_event_is_one_json_line(tmp_path) -> None:
     call = ToolCall("c1", "add", {"a": 1, "b": 2})
     with open_trace(path) as trace:
         trace.tool(call, ToolResult("c1", "add", "3"), 0.0123)
-        trace.end(steps=2, stopped=False, answer="3")
+        trace.end(steps=2, stopped=False, answer="3", elapsed=1.234, tool_calls=1)
 
     tool, end = read_lines(path)
     assert (tool["event"], tool["tool"], tool["arguments"]) == ("tool", "add", {"a": 1, "b": 2})
     assert (tool["duration_ms"], tool["is_error"], tool["result"]) == (12.3, False, "3")
     assert tool["time"].endswith("+00:00")
     assert (end["event"], end["steps"], end["stopped"]) == ("end", 2, False)
+    assert (end["tool_calls"], end["failed_calls"], end["elapsed_s"]) == (1, 0, 1.23)
 
 
 def test_long_results_are_cut_but_their_size_is_kept(tmp_path) -> None:

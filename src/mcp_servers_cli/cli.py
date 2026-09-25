@@ -3,6 +3,7 @@
 import json
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Annotated
 
@@ -19,6 +20,7 @@ from mcp_servers_cli.llm import LLMBackend, ToolCall, ToolResult
 from mcp_servers_cli.rendering import (
     render_answer,
     render_blocks,
+    render_failures,
     render_plan,
     render_server,
     render_tool_call,
@@ -172,10 +174,11 @@ async def agent(
 
 async def _plan(client: Client, llm: LLMBackend, prompt: str, system: str, recorder: Trace) -> None:
     """--dry-run: one model turn, every requested call shown and none executed."""
+    started = time.perf_counter()
     reply = await first_turn(client, llm, prompt, system=system)
     for call in reply.tool_calls:
         recorder.planned(call)
-    recorder.end(steps=1, stopped=False, answer=reply.text)
+    recorder.end(steps=1, stopped=False, answer=reply.text, elapsed=time.perf_counter() - started)
     if reply.tool_calls:
         render_plan(reply.tool_calls)
     else:
@@ -191,6 +194,7 @@ async def _solve(
         render_tool_result(call, result, elapsed)
         recorder.tool(call, result, elapsed)
 
+    started = time.perf_counter()
     run = await run_agent(
         client,
         llm,
@@ -200,10 +204,19 @@ async def _solve(
         on_tool_call=render_tool_call,
         on_tool_result=on_tool_result,
     )
-    recorder.end(steps=run.steps, stopped=run.stopped, answer=run.answer)
+    recorder.end(
+        steps=run.steps,
+        stopped=run.stopped,
+        answer=run.answer,
+        elapsed=time.perf_counter() - started,
+        tool_calls=len(run.results),
+        failed_calls=run.failed,
+    )
     if run.stopped:
         raise RuntimeError(f"no final answer after {max_steps} model turns (see --max-steps)")
     render_answer(run.answer)
+    if run.failed:
+        render_failures(run.failed, len(run.results))
 
 
 def main(tokens: list[str] | None = None) -> None:

@@ -13,6 +13,8 @@ from mcp_servers_cli.inspection import ServerInfo
 from mcp_servers_cli.llm import ToolCall, ToolResult
 
 console = Console()
+# Warnings go to stderr, so that piping the answer elsewhere keeps it clean.
+err_console = Console(stderr=True, soft_wrap=True)
 
 
 def _signature(parameters) -> str:
@@ -96,3 +98,11 @@ def render_plan(calls: Sequence[ToolCall]) -> None:
 
 def render_answer(text: str) -> None:
     console.print(escape(text))
+
+
+def render_failures(failed: int, total: int) -> None:
+    """A model can answer fluently after its tools failed: say so after the answer."""
+    err_console.print(
+        f"[yellow]warning:[/yellow] {failed} of {total} tool call(s) failed; "
+        "the answer may not reflect the server's state"
+    )
