@@ -89,6 +89,7 @@ async def test_a_failing_tool_is_reported_to_the_model(server) -> None:
     result = run.messages[2].tool_results[0]
     assert result.is_error
     assert "disk full" in result.content
+    assert (len(run.results), run.failed) == (1, 1)
 
 
 async def test_an_unknown_tool_is_reported_with_the_available_ones(server) -> None:
