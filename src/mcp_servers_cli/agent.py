@@ -33,6 +33,15 @@ class AgentRun:
     steps: int
     stopped: bool
 
+    @property
+    def results(self) -> list[ToolResult]:
+        """Every tool result of the run, in order."""
+        return [result for message in self.messages for result in message.tool_results]
+
+    @property
+    def failed(self) -> int:
+        return sum(result.is_error for result in self.results)
+
 
 def tool_specs(tools: Sequence[Any]) -> list[ToolSpec]:
     """MCP tools as the model sees them."""

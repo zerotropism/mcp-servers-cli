@@ -47,8 +47,25 @@ class JsonlTrace:
     def planned(self, call: ToolCall) -> None:
         self._write("planned", call_id=call.id, tool=call.name, arguments=call.arguments)
 
-    def end(self, *, steps: int, stopped: bool, answer: str) -> None:
-        self._write("end", steps=steps, stopped=stopped, answer=excerpt(answer))
+    def end(
+        self,
+        *,
+        steps: int,
+        stopped: bool,
+        answer: str,
+        elapsed: float,
+        tool_calls: int = 0,
+        failed_calls: int = 0,
+    ) -> None:
+        self._write(
+            "end",
+            steps=steps,
+            stopped=stopped,
+            tool_calls=tool_calls,
+            failed_calls=failed_calls,
+            elapsed_s=round(elapsed, 2),
+            answer=excerpt(answer),
+        )
 
 
 class NullTrace:
@@ -66,7 +83,16 @@ class NullTrace:
     def planned(self, call: ToolCall) -> None:
         pass
 
-    def end(self, *, steps: int, stopped: bool, answer: str) -> None:
+    def end(
+        self,
+        *,
+        steps: int,
+        stopped: bool,
+        answer: str,
+        elapsed: float,
+        tool_calls: int = 0,
+        failed_calls: int = 0,
+    ) -> None:
         pass
 
 
