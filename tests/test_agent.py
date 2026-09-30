@@ -1,7 +1,8 @@
 """The tool loop against an in-memory FastMCP server and a scripted model: no LLM, no network."""
 
+import mcp_types
 import pytest
-from fastmcp import Client, FastMCP
+from fastmcp import Client, Context, FastMCP
 
 from mcp_servers_cli.agent import (
     MAX_RESULT_CHARS,
@@ -158,3 +159,28 @@ async def test_first_turn_executes_nothing() -> None:
     assert [call.name for call in reply.tool_calls] == ["delete_all"]
     assert executed == []
     assert backend.requests[0][0] == "careful"
+
+
+async def test_a_server_asking_for_sampling_gets_a_clear_refusal() -> None:
+    """No sampling, elicitation or roots handler is declared: the model reads the refusal."""
+    mcp = FastMCP("Needs a model")
+
+    @mcp.tool
+    async def summarize(text: str, ctx: Context) -> str | mcp_types.InputRequiredResult:
+        """Delegates to the client's model, the 2026-07-28 way (SEP-2322)."""
+        if not ctx.input_responses:
+            message = mcp_types.SamplingMessage(
+                role="user", content=mcp_types.TextContent(type="text", text=text)
+            )
+            request = mcp_types.CreateMessageRequest(
+                params=mcp_types.CreateMessageRequestParams(messages=[message], max_tokens=50)
+            )
+            return mcp_types.InputRequiredResult(input_requests={"summary": request})
+        return "unreachable without a sampling handler"
+
+    backend = ScriptedBackend(ask(ToolCall("c1", "summarize", {"text": "x"})), answer("no"))
+    async with Client(mcp) as client:
+        run = await run_agent(client, backend, "summarize x")
+
+    result = run.messages[2].tool_results[0]
+    assert (result.is_error, result.content) == (True, "Sampling not supported")
