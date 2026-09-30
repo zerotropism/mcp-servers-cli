@@ -103,6 +103,23 @@ Unknown top-level arguments are dropped before a call; an invented field inside 
 is left to fail. Dropping `title` from a mistaken filter would widen it to every task and return
 a wrong answer that looks right.
 
+## Client capabilities
+
+MCP lets a server ask its client for three things during a call: a completion from the client's
+model (sampling), an answer from the user (elicitation), and the directories it may work in
+(roots). `mcp-servers-cli` declares none of them. A server that asks gets a one-line refusal,
+`Sampling not supported`, `Elicitation not supported` or `List roots not supported`: `call`
+prints it as an error, `agent` hands it to the model as a failed call.
+
+FastMCP 4 negotiates the 2026-07-28 protocol revision by default. On such a connection a server
+no longer sends these requests itself: its tool returns an input-required result (SEP-2322)
+listing what it needs, and the client answers before the tool runs again. The refusals above
+are what such a server receives.
+
+Handlers will come with the first server of this portfolio that needs one: sampling bridged to
+the `agent` backend, roots from the command line. Elicitation needs someone at the keyboard,
+which `agent` does not assume.
+
 ## Configuring the server you launch
 
 A stdio server runs as a subprocess, and the MCP SDK forwards only a whitelist of environment
