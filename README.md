@@ -6,15 +6,24 @@ tools, resources and prompts the server exposes — then lets you exercise them.
 
 ## Installation
 
-```bash
-uv sync
-uv run mcp-servers-cli --help
-```
-
-Or without cloning, once published:
+Run it without installing anything, with [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uvx mcp-servers-cli inspect --stdio "uvx mcp-server-fetch"
+```
+
+Or install it once, with the Anthropic backend if you need it:
+
+```bash
+uv tool install mcp-servers-cli
+uv tool install 'mcp-servers-cli[anthropic]'
+```
+
+From a clone, for development:
+
+```bash
+uv sync --all-groups
+uv run mcp-servers-cli --help
 ```
 
 ## Commands
