@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import time
+from importlib import metadata
 from pathlib import Path
 from typing import Annotated
 
@@ -33,7 +34,7 @@ from mcp_servers_cli.transports import config_client, http_client, stdio_client
 app = App(
     name="mcp-servers-cli",
     help="Inspect, call and drive any MCP server.",
-    version="0.1.0",
+    version=metadata.version("mcp-servers-cli"),
 )
 
 TARGET = Group("Target", help="Exactly one transport must be given.")
