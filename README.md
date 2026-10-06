@@ -51,6 +51,11 @@ mcp-servers-cli agent "What is 2 + 3?" --model qwen3.5:4b --stdio "uv run server
 
 Inside the REPL: `call <tool> <json>`, `read <uri>`, `list`, `quit`.
 
+Tool results are printed as JSON from their structured content when the tool declares one, so
+a tool returning a list prints that list, not MCP's `{"result": ...}` wrapper. Resource
+contents and text results that hold JSON are printed as that JSON. `inspect` lists resource
+templates such as `report://{path}` apart from fixed resources.
+
 ## Agent
 
 `agent` hands the server's tools to a model and lets it call them until it answers in text. Each
