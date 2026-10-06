@@ -5,7 +5,7 @@ import json
 from fastmcp import Client
 
 from mcp_servers_cli.inspection import inspect_server
-from mcp_servers_cli.rendering import console, render_blocks, render_server
+from mcp_servers_cli.rendering import console, render_blocks, render_result, render_server
 
 MAX_ARGUMENT_LENGTH = 100_000
 HELP = "Commands: call <tool> <json> | read <uri> | list | quit"
@@ -44,7 +44,7 @@ async def run_repl(client: Client) -> None:
                 result = await client.call_tool(
                     parts[1], _arguments(parts[2] if len(parts) > 2 else "{}")
                 )
-                render_blocks(result.content)
+                render_result(result)
             elif action == "read" and len(parts) >= 2:
                 render_blocks(await client.read_resource(parts[1]))
             else:

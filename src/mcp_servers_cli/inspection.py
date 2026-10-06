@@ -29,6 +29,13 @@ class ResourceInfo:
 
 
 @dataclass(frozen=True, slots=True)
+class ResourceTemplateInfo:
+    uri_template: str
+    name: str
+    description: str
+
+
+@dataclass(frozen=True, slots=True)
 class PromptInfo:
     name: str
     description: str
@@ -42,6 +49,7 @@ class ServerInfo:
     tools: list[ToolInfo]
     resources: list[ResourceInfo] | None
     prompts: list[PromptInfo] | None
+    resource_templates: list[ResourceTemplateInfo] | None = None
 
 
 def _parameters(schema: dict | None) -> list[Parameter]:
@@ -85,6 +93,19 @@ async def inspect_resources(client: Client) -> list[ResourceInfo] | None:
     ]
 
 
+async def inspect_resource_templates(client: Client) -> list[ResourceTemplateInfo] | None:
+    """Parameterised resources, such as report://{path}: listed apart from fixed resources."""
+    templates = await _optional(client.list_resource_templates())
+    if templates is None:
+        return None
+    return [
+        ResourceTemplateInfo(
+            uri_template=t.uri_template, name=t.name or "", description=t.description or ""
+        )
+        for t in templates
+    ]
+
+
 async def inspect_prompts(client: Client) -> list[PromptInfo] | None:
     prompts = await _optional(client.list_prompts())
     if prompts is None:
@@ -105,4 +126,5 @@ async def inspect_server(client: Client) -> ServerInfo:
         tools=await inspect_tools(client),
         resources=await inspect_resources(client),
         prompts=await inspect_prompts(client),
+        resource_templates=await inspect_resource_templates(client),
     )
