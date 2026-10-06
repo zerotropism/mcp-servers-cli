@@ -4,6 +4,7 @@ import json
 from collections.abc import Sequence
 from typing import Any
 
+from pydantic_core import to_jsonable_python
 from rich.console import Console
 from rich.markup import escape
 from rich.syntax import Syntax
@@ -46,6 +47,16 @@ def render_server(info: ServerInfo) -> None:
             resources.add_row(escape(resource.uri), escape(resource.description or resource.name))
         console.print(resources)
 
+    if info.resource_templates:
+        templates = Table(title="Resource templates", title_justify="left")
+        templates.add_column("uri template", style="bold")
+        templates.add_column("description")
+        for template in info.resource_templates:
+            templates.add_row(
+                escape(template.uri_template), escape(template.description or template.name)
+            )
+        console.print(templates)
+
     if info.prompts is None:
         console.print("Prompts: not supported by this server")
     else:
@@ -67,10 +78,45 @@ def to_text(blocks: Any) -> list[str]:
     return [block.text if hasattr(block, "text") else str(block) for block in blocks]
 
 
-def render_blocks(blocks: Any) -> None:
-    """Single renderer shared by tool calls and resource reads."""
-    payload = json.dumps(to_text(blocks), indent=2, ensure_ascii=False)
+def _json_or_text(text: str) -> Any:
+    try:
+        return json.loads(text)
+    except ValueError:
+        return text
+
+
+def block_values(blocks: Any) -> Any:
+    """Text blocks holding JSON are shown as that JSON; a single block is shown on its own."""
+    values = [_json_or_text(text) for text in to_text(blocks)]
+    return values[0] if len(values) == 1 else values
+
+
+def result_value(result: Any) -> Any:
+    """What a tool returned: its structured content when it has one, without MCP's wrapper.
+
+    MCP wraps a result that is not an object, such as a list, in {"result": ...}; the client's
+    parsed `data` has the wrapper removed.
+    """
+    if result.structured_content is None:
+        return block_values(result.content)
+    if result.data is not None:
+        return to_jsonable_python(result.data)
+    return result.structured_content
+
+
+def render_json(value: Any) -> None:
+    payload = json.dumps(value, indent=2, ensure_ascii=False)
     console.print(Syntax(payload, "json", theme="ansi_dark", background_color="default"))
+
+
+def render_blocks(blocks: Any) -> None:
+    """Resource contents, or a tool result without structured content."""
+    render_json(block_values(blocks))
+
+
+def render_result(result: Any) -> None:
+    """A tool call result, structured content first."""
+    render_json(result_value(result))
 
 
 def render_tool_call(call: ToolCall) -> None:

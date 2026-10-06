@@ -23,6 +23,7 @@ from mcp_servers_cli.rendering import (
     render_blocks,
     render_failures,
     render_plan,
+    render_result,
     render_server,
     render_tool_call,
     render_tool_result,
@@ -85,7 +86,7 @@ async def inspect(
     env: Env = None,
     quiet: Quiet = False,
 ) -> None:
-    """List the tools, resources and prompts a server exposes."""
+    """List the tools, resources, resource templates and prompts a server exposes."""
     async with build_client(stdio, http, config, server, env, quiet) as client:
         render_server(await inspect_server(client))
 
@@ -105,7 +106,7 @@ async def call(
     """Call one tool with JSON arguments and print the result."""
     async with build_client(stdio, http, config, server, env, quiet) as client:
         result = await client.call_tool(tool, json.loads(arguments))
-        render_blocks(result.content)
+        render_result(result)
 
 
 @app.command
