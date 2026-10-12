@@ -105,8 +105,20 @@ def result_value(result: Any) -> Any:
 
 
 def render_json(value: Any) -> None:
+    """Text as text; anything else as JSON, never cut at the terminal's edge.
+
+    In a terminal, long lines wrap. Piped, the JSON is written unwrapped, so jq can read it.
+    """
+    if isinstance(value, str):
+        console.print(value, markup=False, highlight=False, soft_wrap=True)
+        return
     payload = json.dumps(value, indent=2, ensure_ascii=False)
-    console.print(Syntax(payload, "json", theme="ansi_dark", background_color="default"))
+    if not console.is_terminal:
+        console.out(payload, highlight=False)
+        return
+    console.print(
+        Syntax(payload, "json", theme="ansi_dark", background_color="default", word_wrap=True)
+    )
 
 
 def render_blocks(blocks: Any) -> None:

@@ -53,8 +53,9 @@ Inside the REPL: `call <tool> <json>`, `read <uri>`, `list`, `quit`.
 
 Tool results are printed as JSON from their structured content when the tool declares one, so
 a tool returning a list prints that list, not MCP's `{"result": ...}` wrapper. Resource
-contents and text results that hold JSON are printed as that JSON. `inspect` lists resource
-templates such as `report://{path}` apart from fixed resources.
+contents and text results that hold JSON are printed as that JSON, other text as plain text.
+In a terminal, long JSON lines wrap; piped to a file or to `jq`, the JSON is written as is.
+`inspect` lists resource templates such as `report://{path}` apart from fixed resources.
 
 ## Agent
 
