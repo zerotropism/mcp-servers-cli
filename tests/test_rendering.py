@@ -1,5 +1,7 @@
 """Rendering must produce output for every capability, and never eat server text."""
 
+import json
+
 import pytest
 from fastmcp import Client, FastMCP
 from mcp.types import TextContent
@@ -127,3 +129,30 @@ async def test_results_are_shown_as_returned_without_the_mcp_wrapper(
     async with Client(results_server) as client:
         result = await client.call_tool(tool, {})
     assert rendering.result_value(result) == expected
+
+
+LONG = "The CV matches the job description well, with experience in secure network services"
+
+
+def terminal(monkeypatch, is_terminal: bool) -> Console:
+    console = Console(record=True, width=40, force_terminal=is_terminal)
+    monkeypatch.setattr(rendering, "console", console)
+    return console
+
+
+def test_long_values_wrap_in_a_terminal_instead_of_being_cut(monkeypatch) -> None:
+    console = terminal(monkeypatch, True)
+    rendering.render_json({"explanation": LONG})
+    assert "secure network services" in " ".join(console.export_text().split())
+
+
+def test_piped_output_is_valid_json(monkeypatch) -> None:
+    console = terminal(monkeypatch, False)
+    rendering.render_json([{"explanation": LONG}])
+    assert json.loads(console.export_text()) == [{"explanation": LONG}]
+
+
+def test_text_is_printed_as_text_not_as_a_json_string(monkeypatch) -> None:
+    console = terminal(monkeypatch, True)
+    rendering.render_blocks([text("NETWORK ENGINEER\nBuild [and] operate")])
+    assert console.export_text() == "NETWORK ENGINEER\nBuild [and] operate\n"
