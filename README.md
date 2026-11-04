@@ -93,6 +93,81 @@ jq -r 'select(.event == "tool") | "\(.duration_ms) ms  \(.tool)"' run.jsonl | so
 Arguments and results are written as they are: keep traces out of version control when a server
 handles secrets.
 
+## Example: investigating a log
+
+[log-analyzer](https://github.com/zerotropism/log-analyzer) serves its analysis of an
+authentication log as MCP tools. Here `agent` asks a local model which sources look suspicious,
+and the model answers by calling them. Everything is fetched by `uvx`; nothing needs cloning.
+
+```bash
+# A synthetic log: 5,016 lines, the same for the same seed, with two attackers
+mkdir -p /tmp/logs
+uvx --from git+https://github.com/zerotropism/log-analyzer log-analyzer-gen \
+  --output /tmp/logs/synthetic.log --lines 5000 --seed 42
+
+# The server reads only below LOG_ANALYZER_ROOT, which --env passes to it
+S="uvx --from git+https://github.com/zerotropism/log-analyzer log-analyzer-mcp"
+uvx mcp-servers-cli agent "Which sources look suspicious in synthetic.log?" \
+  --model qwen3.5:4b-mlx --env LOG_ANALYZER_ROOT=/tmp/logs --quiet --stdio "$S"
+```
+
+Run on 4 November 2026 with mcp-servers-cli 0.1.2 and Ollama on an Apple Silicon Mac, 27 s by
+its trace:
+
+```
+-> suspicious_sources {"path": "synthetic.log"}
+<- suspicious_sources ok (0.1s)
+Based on the analysis of `synthetic.log`, there are **two** sources identified as suspicious:
+
+1.  **IP Address:** `10.0.0.1`
+    *   **User:** `attacker1`
+    *   **Error Count:** 8 errors detected between `2024-01-15T23:02:05` and `2024-01-15T23:04:25`.
+
+2.  **IP Address:** `10.0.0.2`
+    *   **User:** `attacker2`
+    *   **Error Count:** 8 errors detected between `2024-01-15T23:34:45` and `2024-01-15T23:37:05`.
+
+These pairs were flagged because they had more than the threshold number of errors within the
+specified time window.
+```
+
+One call, the right tool, the default thresholds, and an answer that matches what the tool
+returns when called directly (output reflowed):
+
+```bash
+uvx mcp-servers-cli call suspicious_sources '{"path": "synthetic.log"}' \
+  --env LOG_ANALYZER_ROOT=/tmp/logs --quiet --stdio "$S"
+```
+
+```json
+[
+  {"ip": "10.0.0.1", "user": "attacker1", "error_count": 8,
+   "time_range": ["2024-01-15T23:02:05", "2024-01-15T23:04:25"]},
+  {"ip": "10.0.0.2", "user": "attacker2", "error_count": 8,
+   "time_range": ["2024-01-15T23:34:45", "2024-01-15T23:37:05"]}
+]
+```
+
+The same question to `llama3.2:3b`, 18 s by its trace:
+
+```
+-> suspicious_sources {"path": "synthetic.log", "threshold": "0", "window_seconds": "0"}
+<- suspicious_sources ok (0.1s)
+The data provided appears to be a log file or a record of IP addresses and their corresponding
+users. Here's a summary of the data:
+...
+* IP address 192.168.0.216 has an "error_count" value of 2, indicating that there were two errors
+recorded for this IP address on the specified date.
+...
+```
+
+It invented two arguments, a threshold and a window of 0, sent as strings. The server accepted
+them, the strings being read as the integers its schema asks for, so the call succeeded and no
+warning followed: every pair with at least one error came back as suspicious, and the answer lists
+ordinary addresses without naming either attacker. The warning after the answer only covers a
+call that failed. A call that succeeds with arguments nobody asked for is the same false
+success, one step earlier; the `->` line is where it shows.
+
 ## Model requirements
 
 Measured on 24 September 2026 against `mcpserver-template` (in-memory backend), three runs per
